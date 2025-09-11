@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "csa-component"
+version = "0.1.0"
+description = "This package contains implementation of critical service awareness component."
+authors = ["ResilMesh"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.12"
+temporalio = "^1.17.0"
+pyyaml = "^6.0.2"
+dacite = "^1.9.2"
+httpx = "^0.28.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
