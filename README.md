@@ -1,8 +1,10 @@
 # CSA
 Critical Service Awareness
 
-Run with
+This component implements computation of criticality for network nodes.
+
+## How to Run
 
 ```shell
-sudo docker exec -it <csa-worker-id> python -m temporal.criticality.workflow
+docker exec -it <csa-worker-id> python -m temporal.criticality.workflow
 ```

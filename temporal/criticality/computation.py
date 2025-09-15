@@ -17,6 +17,7 @@ def compute_criticalities_of_hosts(missions: List[List[Dict[str, Any]]]) -> List
     final_hosts = []
     for mission_representation in missions:
         mission = mission_representation[0]
+
         if "criticality" in mission:
             criticality = mission["criticality"]
         elif "confidentiality_requirement" in mission and "integrity_requirement" in mission and "availability_requirement" in mission:
@@ -24,10 +25,12 @@ def compute_criticalities_of_hosts(missions: List[List[Dict[str, Any]]]) -> List
                               mission["availability_requirement"])
         else:
             raise ValueError(f"Mission {mission} has no criticality nor security requirements.")
+
         if "structure" in mission:
             structure = json.loads(mission["structure"])
         else:
             raise ValueError(f"Mission {mission} does not contain JSON representing its structure.")
+
         mission_name = mission["name"]
         mission_id = None
         for potential_mission in structure["nodes"]["missions"]:
