@@ -1,3 +1,5 @@
+"""This module contains the main procedure for Temporal worker."""
+
 import asyncio
 
 from temporalio.client import Client
@@ -9,12 +11,14 @@ from temporal.criticality.workflow import CriticalityWorkflow
 
 
 async def main() -> None:
+    """
+    This procedure creates a worker for CSA component in Temporal.
+    :return:
+    """
     config = AppConfig.get()
     client = await Client.connect(config.temporal.url, namespace=config.temporal.namespace)
     workflows = [CriticalityWorkflow]
-    activities = []
-    for workflow in workflows:
-        activities += workflow.get_activities()
+    activities = CriticalityWorkflow.get_activities()
     workflow_runner = SandboxedWorkflowRunner(
         restrictions=SandboxRestrictions.default.with_passthrough_modules(
             "temporal.criticality",

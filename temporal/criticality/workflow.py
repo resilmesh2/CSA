@@ -1,3 +1,5 @@
+"""This module contains a workflow for criticality computation."""
+
 import asyncio
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import timedelta
@@ -13,6 +15,10 @@ import uuid
 class CriticalityWorkflow:
     @workflow.run
     async def run(self) -> None:
+        """
+        Run the criticality workflow consisting of three activities.
+        :return:
+        """
         criticality_results = await workflow.execute_activity(
             CriticalityActivities.compute_mission_criticalities,
             start_to_close_timeout=timedelta(minutes=60),

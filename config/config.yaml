@@ -1,7 +1,7 @@
 temporal:
   url: temporal:7233
   namespace: default
-  task_queue: csa
+  csa_task_queue: csa
 
 isim:
   url: "http://isim:8000"
