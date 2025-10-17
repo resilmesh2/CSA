@@ -31,6 +31,11 @@ class CriticalityWorkflow:
         )
 
         await workflow.execute_activity(
+            CriticalityActivities.compute_criticalities,
+            start_to_close_timeout=timedelta(minutes=60),
+        )
+
+        await workflow.execute_activity(
             CriticalityActivities.compute_final_criticalities,
             start_to_close_timeout=timedelta(minutes=60),
         )
