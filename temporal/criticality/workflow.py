@@ -9,6 +9,7 @@ from config import AppConfig
 from temporalio import workflow
 from temporal.criticality.activities import CriticalityActivities
 import uuid
+from temporalio.common import RetryPolicy
 
 
 @workflow.defn(name="CriticalityWorkflow")
@@ -21,17 +22,26 @@ class CriticalityWorkflow:
         """
         criticality_results = await workflow.execute_activity(
             CriticalityActivities.compute_mission_criticalities,
+            retry_policy=RetryPolicy(maximum_attempts=5),
             start_to_close_timeout=timedelta(minutes=60),
         )
 
         await workflow.execute_activity(
             CriticalityActivities.store_mission_criticalities,
             criticality_results,
+            retry_policy=RetryPolicy(maximum_attempts=5),
+            start_to_close_timeout=timedelta(minutes=60),
+        )
+
+        await workflow.execute_activity(
+            CriticalityActivities.compute_criticalities,
+            retry_policy=RetryPolicy(maximum_attempts=5),
             start_to_close_timeout=timedelta(minutes=60),
         )
 
         await workflow.execute_activity(
             CriticalityActivities.compute_final_criticalities,
+            retry_policy=RetryPolicy(maximum_attempts=5),
             start_to_close_timeout=timedelta(minutes=60),
         )
 

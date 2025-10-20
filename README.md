@@ -1,9 +1,12 @@
 # CSA - Critical Service Awareness
 
-This component implements computation of criticality for network nodes.
+This component implements computation of criticality for network nodes. It has a dependency on 
+[ISIM](https://github.com/resilmesh2/ISIM) and
+[workflow orchestrator](https://github.com/resilmesh2/Workflow-Orchestrator) that must be running 
+before deploying the CSA worker.
 
 ## How to Run
-The containers can be built by running
+The CSA worker container can be deployed by running
 
 ```shell
 docker compose up -d
@@ -14,9 +17,8 @@ REST API. Moreover, this component will produce meaningful or any results at all
 the database contains enterprise missions and results from Nmap topology scan provided by CASM. 
 Therefore, consider running also the other components when running CSA.
 
-The `compose.yml` file contains several docker containers that provide Temporal’s functionality. 
-However, the CASM component uses the same containers. Therefore, when executing CASM at the same time, 
-it is necessary to deploy these containers only once.
+The workflow orchestrator repository contains several docker containers that provide Temporal’s functionality. 
+The CSA worker communicates with the Temporal container, which must be up before the deployment.
 
 A workflow for computing criticalities of network nodes can be executed with
 

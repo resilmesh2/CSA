@@ -41,7 +41,14 @@ class CriticalityActivities:
         async with httpx.AsyncClient() as client:
             response = await client.post(f"{self.isim_config.url}/nodes/store_criticality",
                                          json=missions_hosts_criticalities)
-            return response.text
+            return f"Response: {response.text}"
+
+    @activity.defn
+    async def compute_criticalities(self) -> str:
+        async with httpx.AsyncClient() as client:
+            first_response = await client.post(f"{self.isim_config.url}/nodes/betweenness_centrality")
+            second_response = await client.post(f"{self.isim_config.url}/nodes/degree_centrality")
+        return f"First response: {first_response.text}. Second response: {second_response.text}"
 
     @activity.defn
     async def compute_final_criticalities(self) -> str:
@@ -52,8 +59,8 @@ class CriticalityActivities:
         """
         async with httpx.AsyncClient() as client:
             response = await client.post(f"{self.isim_config.url}/nodes/combine_criticality")
-        return response.text
+        return f"Response: {response.text}"
 
     def get_activities(self) -> Sequence[Callable[..., Awaitable[Any]]]:
-        return [self.compute_mission_criticalities, self.store_mission_criticalities,
+        return [self.compute_mission_criticalities, self.store_mission_criticalities, self.compute_criticalities,
                 self.compute_final_criticalities]
