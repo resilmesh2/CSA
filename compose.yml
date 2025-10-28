@@ -5,8 +5,4 @@ services:
     volumes:
       - ./config/config.yaml:/app/config/config.yaml
     networks:
-      - casm_isim_test_network
-
-networks:
-  casm_isim_test_network:
-    name: casm_isim_test_network
+      - resilmesh_network
