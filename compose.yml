@@ -6,8 +6,3 @@ services:
       - ./config/config.yaml:/app/config/config.yaml
     networks:
       - resilmesh_network
-
-
-networks:
-  resilmesh_network:
-    external: true
