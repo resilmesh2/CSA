@@ -1,5 +1,6 @@
 services:
   resilmesh_sap_csa_worker:
+    container_name: resilmesh_sap_csa_worker
     build: .
     restart: unless-stopped
     volumes:
