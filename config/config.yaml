@@ -1,7 +1,7 @@
 temporal:
-  url: resilmesh_sop_wo_temporal:7233
+  url: resilmesh-sop-wo-temporal:7233
   namespace: default
   csa_task_queue: csa
 
 isim:
-  url: "http://resilmesh_sap_isim:8000"
+  url: "http://resilmesh-sap-isim:8000"
