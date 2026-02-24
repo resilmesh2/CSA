@@ -144,22 +144,26 @@ def compute_criticalities_of_hosts(missions: List[List[Dict[str, Any]]]) -> List
                                  "criticality": criticality, "type": "mission"}]
         hosts_intermediate_results = []
 
-        while unprocessed_entities:
-            unprocessed_entity = unprocessed_entities.pop(0)
-            count_of_children = 0
-            if unprocessed_entity["type"] == "OR":
+        try:
+            while unprocessed_entities:
+                unprocessed_entity = unprocessed_entities.pop(0)
+                count_of_children = 0
+                if unprocessed_entity["type"] == "OR":
+                    for relationship in structure["relationships"]["one_way"]:
+                        if relationship["from"] == unprocessed_entity["id"]:
+                            count_of_children += 1
+                if unprocessed_entity["type"] == "host":
+                    hosts_intermediate_results.append(unprocessed_entity)
+                    continue
                 for relationship in structure["relationships"]["one_way"]:
                     if relationship["from"] == unprocessed_entity["id"]:
-                        count_of_children += 1
-            if unprocessed_entity["type"] == "host":
-                hosts_intermediate_results.append(unprocessed_entity)
-                continue
-            for relationship in structure["relationships"]["one_way"]:
-                if relationship["from"] == unprocessed_entity["id"]:
-                    unprocessed_entities.append(
-                        {"id": relationship["to"],
-                         "criticality": unprocessed_entity["criticality"] if unprocessed_entity["type"] != "OR" else unprocessed_entity["criticality"]/count_of_children,
-                         "type": determine_type_of_entity(structure, relationship["to"])})
+                        unprocessed_entities.append(
+                            {"id": relationship["to"],
+                             "criticality": unprocessed_entity["criticality"] if unprocessed_entity["type"] != "OR" else unprocessed_entity["criticality"]/count_of_children,
+                             "type": determine_type_of_entity(structure, relationship["to"])})
+        except TypeError:
+            # Stored JSON does not have valid structure, continue with the next mission
+            continue
 
         determine_host_criticalities(hosts_intermediate_results, structure, final_hosts)
 
