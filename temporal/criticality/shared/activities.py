@@ -7,7 +7,7 @@ import httpx
 
 from config import ISIMConfig
 from temporalio import activity
-from temporal.criticality.computation import compute_criticalities_of_hosts
+from temporal.criticality.shared.mission_computation import compute_criticalities_of_hosts
 
 
 class CriticalityActivities:
@@ -43,24 +43,5 @@ class CriticalityActivities:
                                          json=missions_hosts_criticalities)
             return f"Response: {response.text}"
 
-    @activity.defn
-    async def compute_criticalities(self) -> str:
-        async with httpx.AsyncClient() as client:
-            first_response = await client.post(f"{self.isim_config.url}/nodes/betweenness_centrality")
-            second_response = await client.post(f"{self.isim_config.url}/nodes/degree_centrality")
-        return f"First response: {first_response.text}. Second response: {second_response.text}"
-
-    @activity.defn
-    async def compute_final_criticalities(self) -> str:
-        """
-        This method calls ISIM's REST API endpoint that combines mission criticality
-        and betweenness and degree centralities.
-        :return: text from obtained response from the REST API
-        """
-        async with httpx.AsyncClient() as client:
-            response = await client.post(f"{self.isim_config.url}/nodes/combine_criticality")
-        return f"Response: {response.text}"
-
     def get_activities(self) -> Sequence[Callable[..., Awaitable[Any]]]:
-        return [self.compute_mission_criticalities, self.store_mission_criticalities, self.compute_criticalities,
-                self.compute_final_criticalities]
+        return [self.compute_mission_criticalities, self.store_mission_criticalities]

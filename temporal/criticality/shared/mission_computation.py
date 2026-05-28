@@ -5,7 +5,7 @@ import json
 from typing import List, Any, Dict
 
 
-def determine_type_of_entity(mission_representation, entity_id) -> str:
+def determine_type_of_entity(mission_representation: Dict[str, Any], entity_id: int) -> str:
     """
     This function determines the type of the entity from the mission representation.
     :param mission_representation: the representation of the mission
@@ -42,7 +42,7 @@ def determine_numerical_criticality_of_mission(mission: Dict[str, Any]) -> float
     return criticality
 
 
-def determine_mission_id(mission: Dict[str, Any], structure: Dict[str, Any]) -> str:
+def determine_mission_id(mission: Dict[str, Any], structure: Dict[str, Any]) -> int | None:
     """
     This function determines the id of the mission from the mission representation.
     :param mission: dictionary with properties describing the mission
@@ -83,7 +83,7 @@ def determine_host_criticalities(hosts_intermediate_results: List[Dict[str, Any]
                     final_host_values.append(final_representation)
 
 
-def index_in_host_list(host_dict, host_list):
+def index_in_host_list(host_dict: Dict[str, Any], host_list: List[Dict[str, Any]]) -> int:
     """
     This function returns the index of the host described by host_dict in host_list.
     :param host_dict: dictionary of the host's properties
@@ -98,7 +98,7 @@ def index_in_host_list(host_dict, host_list):
     return -1
 
 
-def hosts_contain_id(hosts_data, host_id):
+def hosts_contain_id(hosts_data: List[Dict[str, Any]], host_id: int) -> bool:
     """
     This function determines whether a host with host ID is contained within hosts data.
     :param hosts_data: list of hosts
@@ -111,7 +111,7 @@ def hosts_contain_id(hosts_data, host_id):
     return False
 
 
-def services_contain_id(services_data, service_id):
+def services_contain_id(services_data: List[Dict[str, Any]], service_id: int) -> bool:
     """
     This function determines whether a service with service ID is contained within services data.
     :param services_data: list of services

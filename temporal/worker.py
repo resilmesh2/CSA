@@ -7,7 +7,11 @@ from temporalio.worker import Worker
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner, SandboxRestrictions
 
 from config import AppConfig
-from temporal.criticality.workflow import CriticalityWorkflow
+from temporal.criticality.nmap_topology.activities import NmapCriticalityActivities
+from temporal.criticality.nmap_topology.workflow import NmapCriticalityWorkflow
+from temporal.criticality.ip_flow.activities import IPFlowCriticalityActivities
+from temporal.criticality.ip_flow.workflow import IPFlowCriticalityWorkflow
+from temporal.criticality.shared.activities import CriticalityActivities
 
 
 async def main() -> None:
@@ -17,8 +21,10 @@ async def main() -> None:
     """
     config = AppConfig.get()
     client = await Client.connect(config.temporal.url, namespace=config.temporal.namespace)
-    workflows = [CriticalityWorkflow]
-    activities = CriticalityWorkflow.get_activities()
+    workflows = [NmapCriticalityWorkflow, IPFlowCriticalityWorkflow]
+    activities = [*NmapCriticalityActivities(config.isim).get_activities(),
+                  *IPFlowCriticalityActivities(config.isim).get_activities(),
+                  *CriticalityActivities(config.isim).get_activities()]
     workflow_runner = SandboxedWorkflowRunner(
         restrictions=SandboxRestrictions.default.with_passthrough_modules(
             "temporal.criticality",

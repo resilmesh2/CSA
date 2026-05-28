@@ -14,19 +14,32 @@ docker compose up -d
 
 It is necessary to execute docker compose for ISIM too. This component relies on its database and 
 REST API. Moreover, this component will produce meaningful or any results at all only when 
-the database contains enterprise missions and results from Nmap topology scan provided by CASM. 
+the database contains enterprise missions and results from Nmap topology scan provided by CASM or IP flow data. 
 Therefore, consider running also the other components when running CSA.
 
 The workflow orchestrator repository contains several docker containers that provide Temporal’s functionality. 
-The CSA worker communicates with the Temporal container, which must be up before the deployment.
+The CSA worker communicates with the Temporal container, which must be up before the deployment. The CSA repository contains two workflows that compute criticalities of network nodes. One of them uses IP flow data and the second one uses results from Nmap topology scan.
 
-A workflow for computing criticalities of network nodes can be executed with
+A workflow for computing criticalities of network nodes using IP flow data can be executed using
 
 ```shell
-docker exec -it <csa-worker-id> python -m temporal.criticality.workflow
+docker exec -it <csa-worker-id> python -m temporal.criticality.ip_flow.workflow
 ```
 
-Results in the Neo4j database can be checked by running:
+A workflow for computing criticalities of network nodes using results from Nmap topology scan can be executed using
+
+```shell
+docker exec -it <csa-worker-id> python -m temporal.criticality.nmap_topology.workflow
+```
+
+Results for IP flow data in the Neo4j database can be checked by running:
+
+```
+MATCH (n:Node) RETURN n.degree_centrality_norm, n.pagerank_centrality_norm, 
+n.mission_criticality, n.final_criticality_flows
+```
+
+Results for data from Nmap topology scan in the Neo4j database can be checked by running:
 
 ```
 MATCH (n:Node) RETURN n.mission_criticality, n.topology_degree_norm, 
