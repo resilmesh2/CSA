@@ -13,6 +13,7 @@ pyyaml = "^6.0.2"
 dacite = "^1.9.2"
 httpx = "^0.28.1"
 whitenoise = "^6.7.0"
+neo4j = "^5.28.1"
 
 [build-system]
 requires = ["poetry-core"]
