@@ -19,10 +19,19 @@ class TemporalConfig:
 class ISIMConfig:
     url: str
 
+
+@dataclass
+class Neo4jConfig:
+    password: str = "supertestovaciheslo"
+    bolt: str = "bolt://resilmesh-sap-neo4j:7687"
+    user: str = "neo4j"
+
+
 @dataclass
 class Config:
     temporal: TemporalConfig
     isim: ISIMConfig
+    neo4j: Neo4jConfig
 
 class AppConfig:
     _config: Config | None = None
