@@ -1,7 +1,9 @@
 """Activities for executing link prediction Cypher queries."""
 
 from collections.abc import Awaitable, Callable, Sequence
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
+from functools import cached_property
+from importlib.resources import files
 from time import monotonic
 from typing import Any
 
@@ -13,6 +15,20 @@ from temporal.link_prediction.shared import (
     LinkPredictionStageResult,
 )
 from temporalio import activity
+
+
+@dataclass(frozen=True)
+class LinkPredictionQuery:
+    stage: str
+    file_name: str
+
+    @cached_property
+    def cypher(self) -> str:
+        return (
+            files("temporal.link_prediction.queries")
+            .joinpath(self.file_name)
+            .read_text()
+        )
 
 
 class LinkPredictionActivities:
@@ -39,11 +55,12 @@ class LinkPredictionActivities:
             async with driver.session() as session:
                 query_params = asdict(params)
                 stages = []
-                for stage_name, query in self._queries(params):
+                for query in self._queries(params):
+                    stage_name = query.stage
                     activity.heartbeat({"stage": stage_name, "status": "started"})
                     activity.logger.info("Starting link prediction stage %s", stage_name)
                     started = monotonic()
-                    result = await session.run(query, query_params)
+                    result = await session.run(query.cypher, query_params)
                     records = [record.data() async for record in result]
                     duration_seconds = monotonic() - started
                     activity.heartbeat(
@@ -76,242 +93,50 @@ class LinkPredictionActivities:
         return [self.run_link_prediction_queries]
 
     @staticmethod
-    def _queries(params: LinkPredictionParams) -> Sequence[tuple[str, str]]:
-        queries = []
+    def _queries(params: LinkPredictionParams) -> Sequence[LinkPredictionQuery]:
         if params.cleanup_existing:
-            queries.extend(
-                [
-                    (
-                        "drop_existing_model",
-                        """
-                        CALL gds.model.drop($model_name, false)
-                        YIELD modelName
-                        RETURN modelName
-                        """,
-                    ),
-                    (
-                        "drop_existing_pipeline",
-                        """
-                        CALL gds.pipeline.drop($pipeline_name, false)
-                        YIELD pipelineName
-                        RETURN pipelineName
-                        """,
-                    ),
-                    (
-                        "drop_existing_graph",
-                        """
-                        CALL gds.graph.drop($graph_name, false)
-                        YIELD graphName
-                        RETURN graphName
-                        """,
-                    ),
-                    (
-                        "delete_existing_direct_dependencies",
-                        """
-                        MATCH ()-[r:DIRECT_DEPENDENCY]->()
-                        DELETE r
-                        RETURN count(r) AS dependenciesDeleted
-                        """,
-                    ),
-                ]
-            )
-        queries.extend([
-            (
+            return [
+                *LinkPredictionActivities._cleanup_queries(),
+                *LinkPredictionActivities._pipeline_queries(),
+            ]
+
+        return LinkPredictionActivities._pipeline_queries()
+
+    @staticmethod
+    def _cleanup_queries() -> list[LinkPredictionQuery]:
+        return [
+            LinkPredictionQuery("drop_existing_model", "drop_existing_model.cypher"),
+            LinkPredictionQuery("drop_existing_pipeline", "drop_existing_pipeline.cypher"),
+            LinkPredictionQuery("drop_existing_graph", "drop_existing_graph.cypher"),
+            LinkPredictionQuery(
+                "delete_existing_direct_dependencies",
+                "delete_existing_direct_dependencies.cypher",
+            ),
+        ]
+
+    @staticmethod
+    def _pipeline_queries() -> list[LinkPredictionQuery]:
+        return [
+            LinkPredictionQuery(
                 "create_direct_dependencies",
-                """
-                MATCH (n1:Node)-[r1:IS_CONNECTED_TO]-(n2:Node)
-                WITH n1, n2, count(r1) AS r1_count
-                WHERE r1_count >= $r1_count_min
-                MERGE (n1)-[:DIRECT_DEPENDENCY]->(n2)
-                RETURN count(*) AS dependenciesProcessed
-                """,
+                "create_direct_dependencies.cypher",
             ),
-            (
+            LinkPredictionQuery(
                 "mark_local_remote_dependencies",
-                """
-                MATCH (n1)-[r1:DIRECT_DEPENDENCY]->(n2)-[r2:DIRECT_DEPENDENCY]->(n3)
-                WHERE EXISTS {
-                  MATCH (n1)-[r3:IS_CONNECTED_TO]->(n2)-[r4:IS_CONNECTED_TO]->(n3)
-                  WHERE r3.start <= r4.start <= r4.end <= r3.end
-                  RETURN n1, n2, n3
-                }
-                SET r1.found = TRUE, r2.found = TRUE
-                RETURN count(*) AS dependenciesMarked
-                """,
+                "mark_local_remote_dependencies.cypher",
             ),
-            (
+            LinkPredictionQuery(
                 "mark_remote_remote_dependencies",
-                """
-                MATCH (n1)-[r1:DIRECT_DEPENDENCY]->(n2)-[r2:DIRECT_DEPENDENCY]->(n3)
-                WHERE EXISTS {
-                  MATCH (n2)<-[r3:IS_CONNECTED_TO]-(n1)-[r4:IS_CONNECTED_TO]->(n3)
-                  WHERE r3.end <= r4.start AND r4.start - r3.end <= $epsilon
-                }
-                SET r1.found = TRUE, r2.found = TRUE
-                RETURN count(*) AS dependenciesMarked
-                """,
+                "mark_remote_remote_dependencies.cypher",
             ),
-            (
-                "project_graph",
-                """
-                MATCH (n1)-[r:DIRECT_DEPENDENCY {found: TRUE}]->(n2)
-                WITH gds.graph.project($graph_name, n1, n2, {
-                    sourceNodeLabels: labels(n1),
-                    targetNodeLabels: labels(n2),
-                    relationshipType: 'POTENTIAL_DEPENDENCY'},
-                    {undirectedRelationshipTypes: ['*']}) AS g
-                RETURN g.graphName AS graph, g.nodeCount AS nodes, g.relationshipCount AS rels
-                """,
-            ),
-            (
-                "create_pipeline",
-                """
-                CALL gds.beta.pipeline.linkPrediction.create($pipeline_name)
-                YIELD name, nodePropertySteps, featureSteps, splitConfig, autoTuningConfig
-                RETURN name, nodePropertySteps, featureSteps, splitConfig, autoTuningConfig
-                """,
-            ),
-            (
-                "add_node2vec_property",
-                """
-                CALL gds.beta.pipeline.linkPrediction.addNodeProperty($pipeline_name, 'Node2Vec', {
-                  mutateProperty: 'embedding',
-                  embeddingDimension: $embedding_dimension,
-                  walkLength: $walk_length,
-                  walksPerNode: $walks_per_node,
-                  windowSize: $window_size,
-                  negativeSamplingRate: $negative_sampling_rate,
-                  iterations: $iterations
-                })
-                YIELD nodePropertySteps
-                RETURN nodePropertySteps
-                """,
-            ),
-            (
-                "add_hadamard_feature",
-                """
-                CALL gds.beta.pipeline.linkPrediction.addFeature($pipeline_name, 'hadamard', {
-                  nodeProperties: ['embedding']
-                }) YIELD featureSteps
-                RETURN featureSteps
-                """,
-            ),
-            (
-                "configure_split",
-                """
-                CALL gds.beta.pipeline.linkPrediction.configureSplit($pipeline_name, {
-                  testFraction: $test_fraction,
-                  trainFraction: $train_fraction,
-                  validationFolds: $validation_folds
-                })
-                YIELD splitConfig
-                RETURN splitConfig
-                """,
-            ),
-            (
-                "add_random_forest",
-                """
-                CALL gds.beta.pipeline.linkPrediction.addRandomForest($pipeline_name, {
-                  numberOfDecisionTrees: $number_of_decision_trees,
-                  maxDepth: $max_depth
-                })
-                YIELD parameterSpace
-                RETURN parameterSpace
-                """,
-            ),
-            (
-                "configure_auto_tuning",
-                """
-                CALL gds.alpha.pipeline.linkPrediction.configureAutoTuning($pipeline_name, {
-                  maxTrials: $max_trials
-                })
-                YIELD autoTuningConfig
-                RETURN autoTuningConfig
-                """,
-            ),
-            (
-                "train",
-                """
-                CALL gds.beta.pipeline.linkPrediction.train($graph_name, {
-                  pipeline: $pipeline_name,
-                  modelName: $model_name,
-                  metrics: ['AUCPR', 'OUT_OF_BAG_ERROR'],
-                  targetRelationshipType: 'POTENTIAL_DEPENDENCY'
-                }) YIELD modelInfo, modelSelectionStats
-                RETURN
-                  modelInfo.bestParameters AS winningModel,
-                  modelInfo.metrics.AUCPR.train.avg AS avgTrainScore,
-                  modelInfo.metrics.AUCPR.outerTrain AS outerTrainScore,
-                  modelInfo.metrics.AUCPR.test AS testScore,
-                  [cand IN modelSelectionStats.modelCandidates | cand.metrics.AUCPR.validation.avg] AS validationScores
-                """,
-            ),
-            (
-                "predict",
-                """
-                CALL gds.beta.pipeline.linkPrediction.predict.mutate($graph_name, {
-                  modelName: $model_name,
-                  relationshipTypes: ['POTENTIAL_DEPENDENCY'],
-                  mutateRelationshipType: 'PREDICTED_DEPENDENCY',
-                  mutateProperty: 'probability',
-                  topN: $top_n,
-                  threshold: $threshold
-                }) YIELD relationshipsWritten, samplingStats
-                RETURN relationshipsWritten, samplingStats
-                """,
-            ),
-            (
-                "stream_predictions",
-                """
-                CALL gds.graph.relationshipProperty.stream(
-                  $graph_name,
-                  'probability',
-                  ['PREDICTED_DEPENDENCY']
-                )
-                YIELD sourceNodeId, targetNodeId, relationshipType, propertyValue
-                WITH
-                  gds.util.asNode(sourceNodeId) AS sourceNode,
-                  gds.util.asNode(targetNodeId) AS targetNode,
-                  relationshipType,
-                  propertyValue AS probability
-                OPTIONAL MATCH (sourceNode)-[:IS_A]-(sourceHost:Host)
-                OPTIONAL MATCH (sourceNode)-[:HAS_ASSIGNED]-(sourceIp:IP)
-                WITH
-                  sourceNode,
-                  targetNode,
-                  relationshipType,
-                  probability,
-                  collect(DISTINCT sourceHost.hostname) AS sourceHostnames,
-                  collect(DISTINCT sourceIp.address) AS sourceIpAddresses
-                OPTIONAL MATCH (targetNode)-[:IS_A]-(targetHost:Host)
-                OPTIONAL MATCH (targetNode)-[:HAS_ASSIGNED]-(targetIp:IP)
-                WITH
-                  sourceNode,
-                  targetNode,
-                  relationshipType,
-                  probability,
-                  sourceHostnames,
-                  sourceIpAddresses,
-                  collect(DISTINCT targetHost.hostname) AS targetHostnames,
-                  collect(DISTINCT targetIp.address) AS targetIpAddresses
-                RETURN
-                  elementId(sourceNode) AS sourceElementId,
-                  coalesce(sourceHostnames[0], sourceIpAddresses[0], elementId(sourceNode)) AS sourceName,
-                  sourceHostnames,
-                  sourceIpAddresses,
-                  labels(sourceNode) AS sourceLabels,
-                  properties(sourceNode) AS sourceProperties,
-                  elementId(targetNode) AS targetElementId,
-                  coalesce(targetHostnames[0], targetIpAddresses[0], elementId(targetNode)) AS targetName,
-                  targetHostnames,
-                  targetIpAddresses,
-                  labels(targetNode) AS targetLabels,
-                  properties(targetNode) AS targetProperties,
-                  relationshipType,
-                  probability
-                ORDER BY probability DESC
-                LIMIT $prediction_limit
-                """,
-            ),
-        ])
-        return queries
+            LinkPredictionQuery("project_graph", "project_graph.cypher"),
+            LinkPredictionQuery("create_pipeline", "create_pipeline.cypher"),
+            LinkPredictionQuery("add_node2vec_property", "add_node2vec_property.cypher"),
+            LinkPredictionQuery("add_hadamard_feature", "add_hadamard_feature.cypher"),
+            LinkPredictionQuery("configure_split", "configure_split.cypher"),
+            LinkPredictionQuery("add_random_forest", "add_random_forest.cypher"),
+            LinkPredictionQuery("configure_auto_tuning", "configure_auto_tuning.cypher"),
+            LinkPredictionQuery("train", "train.cypher"),
+            LinkPredictionQuery("predict", "predict.cypher"),
+            LinkPredictionQuery("stream_predictions", "stream_predictions.cypher"),
+        ]
