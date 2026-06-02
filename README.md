@@ -32,6 +32,60 @@ A workflow for computing criticalities of network nodes using results from Nmap 
 docker exec -it <csa-worker-id> python -m temporal.criticality.nmap_topology.workflow
 ```
 
+A workflow for running the link prediction experiment can be executed using
+
+```shell
+docker exec -it <csa-worker-id> python -m temporal.link_prediction.workflow
+```
+
+Parameters can be overridden with a JSON object:
+
+```shell
+docker exec -it <csa-worker-id> python -m temporal.link_prediction.workflow '{"cleanup_existing": true, "r1_count_min": 10, "epsilon": 1000, "top_n": 100, "threshold": 0.5, "prediction_limit": 500}'
+```
+
+The workflow can also be started from Temporal UI with workflow type `LinkPredictionWorkflow`, task queue `csa`, and one `LinkPredictionParams` argument:
+
+```json
+[
+  {
+    "cleanup_existing": true,
+    "r1_count_min": 10,
+    "epsilon": 1000,
+    "graph_name": "linkPredictionGraph",
+    "pipeline_name": "link-prediction",
+    "model_name": "link-prediction-model",
+    "embedding_dimension": 64,
+    "walk_length": 5,
+    "walks_per_node": 10,
+    "window_size": 4,
+    "negative_sampling_rate": 1,
+    "iterations": 10,
+    "test_fraction": 0.25,
+    "train_fraction": 0.6,
+    "validation_folds": 5,
+    "number_of_decision_trees": 50,
+    "max_depth": 30,
+    "max_trials": 2,
+    "top_n": 100,
+    "threshold": 0.5,
+    "prediction_limit": 500
+  }
+]
+```
+
+Neo4j connectivity and GDS availability can be tested from the worker container using:
+
+```shell
+docker exec -it <csa-worker-id> python scripts/test_link_prediction_live.py
+```
+
+The same script can execute the full mutating link prediction pipeline using:
+
+```shell
+docker exec -it <csa-worker-id> python scripts/test_link_prediction_live.py --execute --params '{"cleanup_existing": true, "r1_count_min": 10, "epsilon": 1000, "top_n": 100, "threshold": 0.5, "prediction_limit": 500}'
+```
+
 Results for IP flow data in the Neo4j database can be checked by running:
 
 ```
