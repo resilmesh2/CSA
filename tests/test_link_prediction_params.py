@@ -73,6 +73,23 @@ def test_extract_overrides_rejects_unknown_fields() -> None:
         extract_link_prediction_overrides({"unknown": None})
 
 
+def test_query_groups_are_separate() -> None:
+    cleanup_queries = LinkPredictionActivities._cleanup_queries()
+    pipeline_queries = LinkPredictionActivities._pipeline_queries()
+
+    assert [query.stage for query in cleanup_queries] == [
+        "drop_existing_model",
+        "drop_existing_pipeline",
+        "drop_existing_graph",
+        "delete_existing_direct_dependencies",
+    ]
+    assert pipeline_queries[0].stage == "create_direct_dependencies"
+    assert pipeline_queries[-1].stage == "stream_predictions"
+    assert {query.stage for query in cleanup_queries}.isdisjoint(
+        {query.stage for query in pipeline_queries}
+    )
+
+
 @pytest.mark.parametrize(
     ("field_name", "invalid_value"),
     [
@@ -149,7 +166,20 @@ async def test_validate_activity_returns_typed_override(
         {"top_n": 50},
     )
 
-    assert result == {"top_n": 50}
+    assert result.params_override == {"top_n": 50}
+    assert result.cleanup_existing is True
+
+
+@pytest.mark.asyncio
+async def test_validate_activity_returns_effective_cleanup_flag(
+    link_prediction_activities: LinkPredictionActivities,
+) -> None:
+    result = await link_prediction_activities.validate_link_prediction_input(
+        {"cleanup_existing": False},
+    )
+
+    assert result.params_override == {"cleanup_existing": False}
+    assert result.cleanup_existing is False
 
 
 @pytest.mark.asyncio

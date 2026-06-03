@@ -69,6 +69,12 @@ def merge_link_prediction_params(
 
 
 @dataclass
+class LinkPredictionInputValidationResult:
+    params_override: dict[str, Any]
+    cleanup_existing: bool
+
+
+@dataclass
 class LinkPredictionStageResult:
     stage: str
     records: list[dict[str, Any]]

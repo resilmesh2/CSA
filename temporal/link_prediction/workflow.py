@@ -27,27 +27,46 @@ class LinkPredictionWorkflow:
         :param input_: optional mapping overriding configured link prediction parameters
         :return: query results grouped by stage
         """
-        params_override = None
-        if input_ is not None:
-            params_override = await workflow.execute_activity_method(
-                LinkPredictionActivities.validate_link_prediction_input,
-                input_,
-                retry_policy=RetryPolicy(maximum_attempts=1),
-                start_to_close_timeout=timedelta(minutes=5),
-            )
+        validation_result = await workflow.execute_activity_method(
+            LinkPredictionActivities.validate_link_prediction_input,
+            input_ or {},
+            retry_policy=RetryPolicy(maximum_attempts=1),
+            start_to_close_timeout=timedelta(minutes=5),
+        )
+        params_override = validation_result.params_override
 
-        return await workflow.execute_activity_method(
-            LinkPredictionActivities.run_link_prediction_queries,
+        cleanup_stages = []
+        if validation_result.cleanup_existing:
+            cleanup_result = await workflow.execute_activity_method(
+                LinkPredictionActivities.run_link_prediction_cleanup_queries,
+                params_override,
+                retry_policy=RetryPolicy(maximum_attempts=1),
+                heartbeat_timeout=timedelta(minutes=5),
+                start_to_close_timeout=timedelta(minutes=30),
+            )
+            cleanup_stages = cleanup_result.stages
+
+        pipeline_result = await workflow.execute_activity_method(
+            LinkPredictionActivities.run_link_prediction_pipeline_queries,
             params_override,
             retry_policy=RetryPolicy(maximum_attempts=1),
             heartbeat_timeout=timedelta(minutes=30),
             start_to_close_timeout=timedelta(hours=4),
         )
 
+        return LinkPredictionResult(
+            stages=[
+                *cleanup_stages,
+                *pipeline_result.stages,
+            ]
+        )
+
 
 async def main() -> None:
     config = AppConfig.get()
-    client = await Client.connect(config.temporal.url, namespace=config.temporal.namespace)
+    client = await Client.connect(
+        config.temporal.url, namespace=config.temporal.namespace
+    )
     workflow_id = uuid.uuid4().hex
     params = parse_params_arg()
     await client.start_workflow(

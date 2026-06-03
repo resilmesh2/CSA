@@ -10,11 +10,13 @@ BASE_DIR = Path(__file__).resolve().parent
 TEMPORAL_URL = "temporal:7233"
 TEMPORAL_NAMESPACE = "default"
 
+
 @dataclass
 class TemporalConfig:
     url: str = TEMPORAL_URL
     namespace: str = TEMPORAL_NAMESPACE
     csa_task_queue: str = "csa"
+
 
 @dataclass
 class ISIMConfig:
@@ -34,6 +36,7 @@ class Config:
     isim: ISIMConfig
     neo4j: Neo4jConfig
     link_prediction: LinkPredictionParams
+
 
 class AppConfig:
     _config: Config | None = None
