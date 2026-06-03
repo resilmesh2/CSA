@@ -3,52 +3,60 @@
 from dataclasses import dataclass
 from typing import Any
 
+from pydantic import BaseModel, ConfigDict, Field
 
-@dataclass
-class LinkPredictionParams:
+
+class LinkPredictionParams(BaseModel):
     """Parameters for link prediction Cypher queries and GDS pipeline tuning."""
 
-    cleanup_existing: bool = True
-    r1_count_min: int = 10
-    epsilon: int = 1000
-    graph_name: str = "linkPredictionGraph"
-    pipeline_name: str = "link-prediction"
-    model_name: str = "link-prediction-model"
-    embedding_dimension: int = 64
-    walk_length: int = 5
-    walks_per_node: int = 10
-    window_size: int = 4
-    negative_sampling_rate: int = 1
-    iterations: int = 10
-    test_fraction: float = 0.25
-    train_fraction: float = 0.6
-    validation_folds: int = 5
-    number_of_decision_trees: int = 50
-    max_depth: int = 30
-    max_trials: int = 2
-    top_n: int = 100
-    threshold: float = 0.5
-    prediction_limit: int = 500
+    model_config = ConfigDict(extra="forbid")
 
-    def validate(self) -> None:
-        if self.walk_length < 2:
-            raise ValueError("walk_length must be >= 2")
-        if self.window_size < 2:
-            raise ValueError("window_size must be >= 2")
-        if self.walks_per_node < 1:
-            raise ValueError("walks_per_node must be >= 1")
-        if self.iterations < 1:
-            raise ValueError("iterations must be >= 1")
-        if self.embedding_dimension < 1:
-            raise ValueError("embedding_dimension must be >= 1")
-        if self.validation_folds < 2:
-            raise ValueError("validation_folds must be >= 2")
-        if self.number_of_decision_trees < 1:
-            raise ValueError("number_of_decision_trees must be >= 1")
-        if self.max_depth < 1:
-            raise ValueError("max_depth must be >= 1")
-        if self.max_trials < 1:
-            raise ValueError("max_trials must be >= 1")
+    cleanup_existing: bool
+    r1_count_min: int = Field(ge=1)
+    epsilon: int = Field(ge=0)
+    graph_name: str
+    pipeline_name: str
+    model_name: str
+    embedding_dimension: int = Field(ge=1)
+    walk_length: int = Field(ge=2)
+    walks_per_node: int = Field(ge=1)
+    window_size: int = Field(ge=2)
+    negative_sampling_rate: int = Field(ge=1)
+    iterations: int = Field(ge=1)
+    test_fraction: float = Field(gt=0, lt=1)
+    train_fraction: float = Field(gt=0, lt=1)
+    validation_folds: int = Field(ge=2)
+    number_of_decision_trees: int = Field(ge=1)
+    max_depth: int = Field(ge=1)
+    max_trials: int = Field(ge=1)
+    top_n: int = Field(ge=1)
+    threshold: float = Field(ge=0, le=1)
+    prediction_limit: int = Field(ge=1)
+
+
+def extract_link_prediction_overrides(input_: dict[str, Any]) -> dict[str, Any]:
+    unknown_fields = set(input_) - set(LinkPredictionParams.model_fields)
+    if unknown_fields:
+        raise ValueError(
+            "Unknown link prediction params: " + ", ".join(sorted(unknown_fields))
+        )
+
+    return {key: value for key, value in input_.items() if value is not None}
+
+
+def merge_link_prediction_params(
+    base: LinkPredictionParams,
+    override: dict[str, Any] | None,
+) -> LinkPredictionParams:
+    if override is None:
+        return base
+
+    return LinkPredictionParams.model_validate(
+        {
+            **base.model_dump(),
+            **override,
+        }
+    )
 
 
 @dataclass
