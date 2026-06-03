@@ -1,7 +1,7 @@
 """Activities for executing link prediction Cypher queries."""
 
 from collections.abc import Awaitable, Callable, Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from functools import cached_property
 from importlib.resources import files
 from time import monotonic
@@ -13,6 +13,8 @@ from temporal.link_prediction.shared import (
     LinkPredictionParams,
     LinkPredictionResult,
     LinkPredictionStageResult,
+    extract_link_prediction_overrides,
+    merge_link_prediction_params,
 )
 from temporalio import activity
 
@@ -34,26 +36,51 @@ class LinkPredictionQuery:
 class LinkPredictionActivities:
     """Activities used by the link prediction workflow."""
 
-    def __init__(self, neo4j_config: Neo4jConfig) -> None:
+    def __init__(
+        self,
+        neo4j_config: Neo4jConfig,
+        link_prediction_config: LinkPredictionParams,
+    ) -> None:
         self.neo4j_config = neo4j_config
+        self.link_prediction_config = link_prediction_config
+
+    @activity.defn
+    async def validate_link_prediction_input(
+        self,
+        input_: dict[str, Any],
+    ) -> dict[str, Any]:
+        """
+        Validate and normalize workflow input overriding configured defaults.
+        :param input_: mapping compatible with LinkPredictionParams
+        :return: normalized override values
+        """
+        params_override = extract_link_prediction_overrides(input_)
+        merge_link_prediction_params(
+            self.link_prediction_config,
+            params_override,
+        )
+        return params_override
 
     @activity.defn
     async def run_link_prediction_queries(
-        self, params: LinkPredictionParams
+        self, params_override: dict[str, Any] | None
     ) -> LinkPredictionResult:
         """
         Execute link prediction Cypher queries in the required order.
-        :param params: parameters used by Cypher queries and GDS pipeline configuration
+        :param params_override: optional workflow input overriding configured defaults
         :return: records returned by each query stage
         """
-        params.validate()
+        params = merge_link_prediction_params(
+            self.link_prediction_config,
+            params_override,
+        )
         driver = AsyncGraphDatabase.driver(
             self.neo4j_config.bolt,
             auth=(self.neo4j_config.user, self.neo4j_config.password),
         )
         try:
             async with driver.session() as session:
-                query_params = asdict(params)
+                query_params = params.model_dump()
                 stages = []
                 for query in self._queries(params):
                     stage_name = query.stage
@@ -90,7 +117,10 @@ class LinkPredictionActivities:
             await driver.close()
 
     def get_activities(self) -> Sequence[Callable[..., Awaitable[Any]]]:
-        return [self.run_link_prediction_queries]
+        return [
+            self.validate_link_prediction_input,
+            self.run_link_prediction_queries,
+        ]
 
     @staticmethod
     def _queries(params: LinkPredictionParams) -> Sequence[LinkPredictionQuery]:
