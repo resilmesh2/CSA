@@ -10,3 +10,26 @@ neo4j:
   bolt: "bolt://neo4j:7687"
   user: "neo4j"
   password: "supertestovaciheslo"
+
+link_prediction:
+  cleanup_existing: true
+  r1_count_min: 10
+  epsilon: 1000
+  graph_name: "linkPredictionGraph"
+  pipeline_name: "link-prediction"
+  model_name: "link-prediction-model"
+  embedding_dimension: 64
+  walk_length: 5
+  walks_per_node: 10
+  window_size: 4
+  negative_sampling_rate: 1
+  iterations: 10
+  test_fraction: 0.25
+  train_fraction: 0.6
+  validation_folds: 5
+  number_of_decision_trees: 50
+  max_depth: 30
+  max_trials: 2
+  top_n: 100
+  threshold: 0.5
+  prediction_limit: 500

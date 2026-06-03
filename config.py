@@ -1,8 +1,9 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
 from dacite import from_dict
+from temporal.link_prediction.shared import LinkPredictionParams
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -32,6 +33,7 @@ class Config:
     temporal: TemporalConfig
     isim: ISIMConfig
     neo4j: Neo4jConfig
+    link_prediction: LinkPredictionParams
 
 class AppConfig:
     _config: Config | None = None
@@ -42,5 +44,8 @@ class AppConfig:
             config_file = BASE_DIR / "config/config.yaml"
             with Path.open(config_file, "r") as f:
                 raw_config = yaml.safe_load(f)
+            raw_config["link_prediction"] = LinkPredictionParams.model_validate(
+                raw_config["link_prediction"]
+            )
             cls._config = from_dict(Config, raw_config)
         return cls._config
