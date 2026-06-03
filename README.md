@@ -38,52 +38,20 @@ A workflow for running the link prediction experiment can be executed using
 docker exec -it <csa-worker-id> python -m temporal.link_prediction.workflow
 ```
 
-Parameters can be overridden with a JSON object:
+Default link prediction parameters are stored in `config/config.yaml` under the `link_prediction` section. Any workflow input fields override those configured defaults:
 
 ```shell
-docker exec -it <csa-worker-id> python -m temporal.link_prediction.workflow '{"cleanup_existing": true, "r1_count_min": 10, "epsilon": 1000, "top_n": 100, "threshold": 0.5, "prediction_limit": 500}'
+docker exec -it <csa-worker-id> python -m temporal.link_prediction.workflow '{"top_n": 50, "threshold": 0.5, "prediction_limit": 20}'
 ```
 
-The workflow can also be started from Temporal UI with workflow type `LinkPredictionWorkflow`, task queue `csa`, and one `LinkPredictionParams` argument:
+The workflow can also be started from Temporal UI with workflow type `LinkPredictionWorkflow`, task queue `csa`, and one JSON object argument. Omit the input to use configured defaults, or pass only fields to override:
 
 ```json
-[
-  {
-    "cleanup_existing": true,
-    "r1_count_min": 10,
-    "epsilon": 1000,
-    "graph_name": "linkPredictionGraph",
-    "pipeline_name": "link-prediction",
-    "model_name": "link-prediction-model",
-    "embedding_dimension": 64,
-    "walk_length": 5,
-    "walks_per_node": 10,
-    "window_size": 4,
-    "negative_sampling_rate": 1,
-    "iterations": 10,
-    "test_fraction": 0.25,
-    "train_fraction": 0.6,
-    "validation_folds": 5,
-    "number_of_decision_trees": 50,
-    "max_depth": 30,
-    "max_trials": 2,
-    "top_n": 100,
-    "threshold": 0.5,
-    "prediction_limit": 500
-  }
-]
-```
-
-Neo4j connectivity and GDS availability can be tested from the worker container using:
-
-```shell
-docker exec -it <csa-worker-id> python scripts/test_link_prediction_live.py
-```
-
-The same script can execute the full mutating link prediction pipeline using:
-
-```shell
-docker exec -it <csa-worker-id> python scripts/test_link_prediction_live.py --execute --params '{"cleanup_existing": true, "r1_count_min": 10, "epsilon": 1000, "top_n": 100, "threshold": 0.5, "prediction_limit": 500}'
+{
+  "top_n": 50,
+  "threshold": 0.5,
+  "prediction_limit": 20
+}
 ```
 
 Results for IP flow data in the Neo4j database can be checked by running:
