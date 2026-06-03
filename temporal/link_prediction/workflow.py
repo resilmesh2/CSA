@@ -5,29 +5,40 @@ from datetime import timedelta
 import json
 import sys
 import uuid
+from typing import Any
 
 from config import AppConfig
-from temporal.link_prediction.shared import LinkPredictionParams, LinkPredictionResult
+from temporal.link_prediction.shared import LinkPredictionResult
 from temporalio import workflow
 from temporalio.client import Client
 from temporalio.common import RetryPolicy
+from temporal.link_prediction.activities import LinkPredictionActivities
 
 
 @workflow.defn(name="LinkPredictionWorkflow")
 class LinkPredictionWorkflow:
     @workflow.run
-    async def run(self, params: LinkPredictionParams | None = None) -> LinkPredictionResult:
+    async def run(
+        self,
+        input_: dict[str, Any] | None = None,
+    ) -> LinkPredictionResult:
         """
         Run GDS link prediction pipeline with configurable experiment parameters.
-        :param params: parameters for Cypher queries and GDS pipeline configuration
+        :param input_: optional mapping overriding configured link prediction parameters
         :return: query results grouped by stage
         """
-        from temporal.link_prediction.activities import LinkPredictionActivities
+        params_override = None
+        if input_ is not None:
+            params_override = await workflow.execute_activity_method(
+                LinkPredictionActivities.validate_link_prediction_input,
+                input_,
+                retry_policy=RetryPolicy(maximum_attempts=1),
+                start_to_close_timeout=timedelta(minutes=5),
+            )
 
-        params = params or LinkPredictionParams()
         return await workflow.execute_activity_method(
             LinkPredictionActivities.run_link_prediction_queries,
-            params,
+            params_override,
             retry_policy=RetryPolicy(maximum_attempts=1),
             heartbeat_timeout=timedelta(minutes=30),
             start_to_close_timeout=timedelta(hours=4),
@@ -47,11 +58,11 @@ async def main() -> None:
     )
 
 
-def parse_params_arg() -> LinkPredictionParams:
+def parse_params_arg() -> dict[str, Any] | None:
     if len(sys.argv) <= 1:
-        return LinkPredictionParams()
+        return None
 
-    return LinkPredictionParams(**json.loads(sys.argv[1]))
+    return json.loads(sys.argv[1])
 
 
 if __name__ == "__main__":

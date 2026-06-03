@@ -27,7 +27,10 @@ async def main() -> None:
     activities = [*NmapCriticalityActivities(config.isim).get_activities(),
                   *IPFlowCriticalityActivities(config.isim).get_activities(),
                   *CriticalityActivities(config.isim).get_activities(),
-                  *LinkPredictionActivities(config.neo4j).get_activities()]
+                  *LinkPredictionActivities(
+                      config.neo4j,
+                      config.link_prediction,
+                  ).get_activities()]
     workflow_runner = SandboxedWorkflowRunner(
         restrictions=SandboxRestrictions.default.with_passthrough_modules(
             "temporal.criticality",
