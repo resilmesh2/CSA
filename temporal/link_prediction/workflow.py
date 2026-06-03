@@ -41,7 +41,7 @@ class LinkPredictionWorkflow:
                 LinkPredictionActivities.run_link_prediction_cleanup_queries,
                 params_override,
                 retry_policy=RetryPolicy(maximum_attempts=1),
-                heartbeat_timeout=timedelta(minutes=5),
+                heartbeat_timeout=timedelta(minutes=15),
                 start_to_close_timeout=timedelta(minutes=30),
             )
             cleanup_stages = cleanup_result.stages
