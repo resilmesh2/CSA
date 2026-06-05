@@ -7,7 +7,7 @@ isim:
   url: "http://resilmesh-sap-isim:8000"
 
 neo4j:
-  bolt: "bolt://neo4j:7687"
+  bolt: "bolt://resilmesh-sap-neo4j:7687"
   user: "neo4j"
   password: "supertestovaciheslo"
 
