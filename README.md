@@ -32,6 +32,28 @@ A workflow for computing criticalities of network nodes using results from Nmap 
 docker exec -it <csa-worker-id> python -m temporal.criticality.nmap_topology.workflow
 ```
 
+A workflow for running the link prediction experiment can be executed using
+
+```shell
+docker exec -it <csa-worker-id> python -m temporal.link_prediction.workflow
+```
+
+Default link prediction parameters are stored in `config/config.yaml` under the `link_prediction` section. Any workflow input fields override those configured defaults:
+
+```shell
+docker exec -it <csa-worker-id> python -m temporal.link_prediction.workflow '{"top_n": 50, "threshold": 0.5, "prediction_limit": 20}'
+```
+
+The workflow can also be started from Temporal UI with workflow type `LinkPredictionWorkflow`, task queue `csa`, and one JSON object argument. Omit the input to use configured defaults, or pass only fields to override:
+
+```json
+{
+  "top_n": 50,
+  "threshold": 0.5,
+  "prediction_limit": 20
+}
+```
+
 Results for IP flow data in the Neo4j database can be checked by running:
 
 ```
